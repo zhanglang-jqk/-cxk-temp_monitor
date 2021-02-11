@@ -29,11 +29,11 @@ HardwareSerial LTE_Serial(LTE_RX, LTE_TX);
 
 Ethernet eth = Ethernet();
 
-// const char apn[10] = "CMNET";
-const char apn[10] = "UNINET";
-const char URL[100] = "mbed.org";
+const char apn[10] = "CMNET";
+// const char apn[10] = "UNINET";
+const char URL[100] = "116.5.195.83";
 char http_cmd[100] = "GET /media/uploads/mbed_official/hello.txt HTTP/1.0\n\r\n\r";
-int port = 80;
+int port = 8081;
 
 int ret = 0;
 
@@ -45,6 +45,7 @@ void setup()
   MODULE_PORT.begin(115200);
   pinMode(PWR4G_PIN, OUTPUT), OPEN_4GPWR();
   pinMode(VDD_PIN, OUTPUT), CLOSE_VDD();
+  // delay(2000);  //确保4G模块稳定启动
 
   pinMode(PWRKEY_PIN, OUTPUT);
   PWRKEY_LOW(), delay(800), PWRKEY_HIGH();
@@ -79,6 +80,7 @@ void setup()
   {
     Serial.println("Connect Error!");
   }
+
 }
 
 void loop()
