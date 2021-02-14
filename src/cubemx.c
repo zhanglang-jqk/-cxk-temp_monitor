@@ -106,9 +106,43 @@ void SystemClock_Config(void)
   */
 void MX_GPIO_Init()
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, CS1_Pin|SCLK1_Pin|SDI1_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, CS2_Pin|SCLK2_Pin|SDI2_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : CS1_Pin SCLK1_Pin SDI1_Pin */
+  GPIO_InitStruct.Pin = CS1_Pin|SCLK1_Pin|SDI1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : SDO1_Pin */
+  GPIO_InitStruct.Pin = SDO1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(SDO1_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : CS2_Pin SCLK2_Pin SDI2_Pin */
+  GPIO_InitStruct.Pin = CS2_Pin|SCLK2_Pin|SDI2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : SDO2_Pin */
+  GPIO_InitStruct.Pin = SDO2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(SDO2_GPIO_Port, &GPIO_InitStruct);
 
 }
 
