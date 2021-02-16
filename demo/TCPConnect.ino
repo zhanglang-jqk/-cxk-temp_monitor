@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include "STM32LowPower.h"
+#include "modules/low_power/STM32LowPower.h"
 #include "ethernet.h"
 
 #define LED_BUILTIN PB11
@@ -27,13 +27,14 @@
 #define LTE_RX PA3
 HardwareSerial LTE_Serial(LTE_RX, LTE_TX);
 
-Ethernet eth = Ethernet();
+extern Ethernet eth;
+// Ethernet eth = Ethernet();
 
 // const char apn[10] = "CMNET";
 const char apn[10] = "UNINET";
-const char URL[100] = "mbed.org";
+const char URL[100] = "116.5.192.226";
 char http_cmd[100] = "GET /media/uploads/mbed_official/hello.txt HTTP/1.0\n\r\n\r";
-int port = 80;
+int port = 8081;
 
 int ret = 0;
 

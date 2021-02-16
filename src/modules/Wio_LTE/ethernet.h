@@ -110,7 +110,8 @@ public:
      *      -1 on error
      *      0 on success
      */
-    bool connect(const char* ip, int port, int connectType = TCP, uint8_t dataAccessMode = SOCKET_DIRECT_PUSH_MODE);
+    // bool connect(const char* ip, int port, int connectType = TCP, uint8_t dataAccessMode = SOCKET_DIRECT_PUSH_MODE);
+    bool connect(const char* ip, int port, int connectType = TCP, uint8_t dataAccessMode = SOCKET_BUFFER_MODE);
 
     /** Write data to socket server
      *  @param  data    data that will be send to socket server
