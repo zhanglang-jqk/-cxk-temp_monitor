@@ -1,10 +1,11 @@
 // #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
-
+#include "modules/max31865/max31865.h"
 #include "UART_Interface.h"
-#include "aliyun_mqtt.h"
 #include "modules/quectel/quectel_client.h"
+#include "aliyun_mqtt.h"
+/*  ---------------------------------------------------------------------------------------------------------------*/
 
 #define PRODUCT_KEY "a1vhKQ19mpk"
 #define DEVICE_NAME "CkCuGNUkYm6sWVsbGQl5"
@@ -24,12 +25,19 @@
 
 #define LTE_TX PA2
 #define LTE_RX PA3
+/*  ---------------------------------------------------------------------------------------------------------------*/
 HardwareSerial LTE_Serial(LTE_RX, LTE_TX);
 
 unsigned long lastMs = 0;
 
 QuectelClient espClient;
 PubSubClient mqttClient(espClient);
+
+Max31865 rtd1, rtd2;
+double internal_temperature = 0;
+double external_templature = 0;
+
+/*  ---------------------------------------------------------------------------------------------------------------*/
 
 void callback(char *topic, byte *payload, unsigned int length)
 {
@@ -59,6 +67,7 @@ void mqttCheckConnect()
         {
         }
         Serial.println("MQTT connect succeed!");
+        delay(1000);
         // client.subscribe(ALINK_TOPIC_PROP_POSTRSP);
         mqttClient.subscribe(ALINK_TOPIC_PROP_SET);
         Serial.println("subscribe done");
@@ -67,10 +76,12 @@ void mqttCheckConnect()
 
 void mqttIntervalPost()
 {
-    char param[32];
+    char param[128];
     char jsonBuf[128];
 
-    sprintf(param, "{\"MotionAlarmState\":%d}", digitalRead(13));
+    sprintf(param, "{\"internal_temperature\":%d.%d,\"external_templature\":%d.%d}",
+            (int)internal_temperature, (int)(internal_temperature * 100) % 100,
+            (int)external_templature, (int)(external_templature * 100) % 100);
     sprintf(jsonBuf, ALINK_BODY_FORMAT, ALINK_METHOD_PROP_POST, param);
     Serial.println(jsonBuf);
     mqttClient.publish(ALINK_TOPIC_PROP_POST, jsonBuf);
@@ -78,20 +89,23 @@ void mqttIntervalPost()
 
 void setup()
 {
-
-    /* initialize serial for debugging */
-    Serial.begin(115200);
-    LTE_Serial.begin(115200);
-
-    Serial.println("Start");
-
-    mqttClient.setCallback(callback);
-
     // pinMode(PWR4G_PIN, OUTPUT), OPEN_4GPWR();
     // pinMode(VDD_PIN, OUTPUT), CLOSE_VDD();
 
     // pinMode(PWRKEY_PIN, OUTPUT);
     // PWRKEY_LOW(), delay(800), PWRKEY_HIGH();
+
+    /* initialize serial for debugging */
+    Serial.begin(115200);
+
+    rtd1.begin(PA4, PA5, PA6, PA7);
+    rtd2.begin(PB12, PB13, PB14, PB15);
+
+    LTE_Serial.begin(115200);
+
+    Serial.println("begin...");
+
+    mqttClient.setCallback(callback);
 }
 
 // the loop function runs over and over again forever
@@ -110,7 +124,9 @@ void loop()
 
     mqttClient.loop();
 
-    unsigned int WAIT_MS = 2000;
-    delay(WAIT_MS); // ms
-    Serial.println(millis() / WAIT_MS);
+    internal_temperature = rtd1.getTemperature();
+    external_templature = rtd2.getTemperature();
+    Serial.printf("t1=%d,t2=%d\r\n", (int)internal_temperature, (int)external_templature);
+
+    delay(500); // ms
 }

@@ -109,8 +109,7 @@ void Max31865::setWire(numwires_t wires)
 //ªÒ»°RTD
 uint16_t Max31865::readRTD(void)
 {
-    uint16_t res =
-        {0};
+    uint16_t res = {0};
     uint8_t reg = 0;
     clearFault();
     enableBias(1);
