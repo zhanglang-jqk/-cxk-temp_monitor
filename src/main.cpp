@@ -1,6 +1,7 @@
 // #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#include "modules/flash/stm32_flash.h"
 #include "modules/max31865/max31865.h"
 #include "UART_Interface.h"
 #include "modules/quectel/quectel_client.h"
@@ -33,9 +34,11 @@ unsigned long lastMs = 0;
 QuectelClient espClient;
 PubSubClient mqttClient(espClient);
 
+STM32Flash flash;
 Max31865 rtd1, rtd2;
-double internal_temperature = 0;
-double external_templature = 0;
+
+float internal_temperature = 0;
+float external_templature = 0;
 
 /*  ---------------------------------------------------------------------------------------------------------------*/
 
@@ -67,7 +70,6 @@ void mqttCheckConnect()
         {
         }
         Serial.println("MQTT connect succeed!");
-        delay(1000);
         // client.subscribe(ALINK_TOPIC_PROP_POSTRSP);
         mqttClient.subscribe(ALINK_TOPIC_PROP_SET);
         Serial.println("subscribe done");
@@ -97,6 +99,7 @@ void setup()
 
     /* initialize serial for debugging */
     Serial.begin(115200);
+    flash.begin();
 
     rtd1.begin(PA4, PA5, PA6, PA7);
     rtd2.begin(PB12, PB13, PB14, PB15);
@@ -106,6 +109,16 @@ void setup()
     Serial.println("begin...");
 
     mqttClient.setCallback(callback);
+
+    char *str = "hello123456789123451";
+    char *read_buf[10] = {0};
+
+    flash.writeBuffer((uint8_t *)str, strlen(str) + 1);
+    flash.readBuffer((uint8_t *)read_buf, strlen(str) + 1);
+    Serial.println((char *)read_buf);
+    Serial.flush();
+    while (1)
+        ;
 }
 
 // the loop function runs over and over again forever

@@ -1,22 +1,29 @@
 /***********************************************************************
- * @file flash.h
- * FLASH
+ * @file    stm32_flash.h
+ * STM32_FLASH
  * @author	:	ch
  * @brief	:
  * @version:	v1.0
- * @Copyright (C)  2020-12-03  .cdWFVCEL. all right reserved
+ * @Copyright (C)  2021-02-17  .cdWFVCEL. all right reserved
 ***********************************************************************/
 
-#ifndef __FLASH_H_
-#define __FLASH_H_
+#ifndef __STM32_FLASH_H_
+#define __STM32_FLASH_H_
 /* 包含头文件 ------------------------------------------------------------------*/
 #include "ch/bsp.h"
+#include "modules/flash/flash.h"
 /* 宏定义 ----------------------------------------------------------------------*/
-#define FLASH_START_ADDRESS (63 * 1024) //FLASH 地址
+#define PROGMEM_ADDR FLASH_START_ADDRESS
 /* 类型定义 --------------------------------------------------------------------*/
+class STM32Flash
+{
+public:
+    void begin(uint32_t startAddr = PROGMEM_ADDR);
+    void writeBuffer(uint8_t *pbuf, uint16_t len, uint32_t addr = PROGMEM_ADDR);
+    void readBuffer(uint8_t *pbuf, uint16_t len, uint32_t addr = PROGMEM_ADDR);
+private:
+    uint32_t _startAddr = PROGMEM_ADDR;
+};
 /* 变量声明 --------------------------------------------------------------------*/
 /* 函数声明 --------------------------------------------------------------------*/
-void FLASH_Init();
-void FLASH_WriteBuffer(u32 addr,u8 * pBuf,u16 len);
-void FLASH_ReadBuffer(u32 addr,u8 * pBuf,u16 len);
-#endif // __FLASH_H_
+#endif // __STM32_FLASH_H_
