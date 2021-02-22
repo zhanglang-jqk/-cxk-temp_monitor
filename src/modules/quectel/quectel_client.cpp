@@ -56,7 +56,7 @@ int QuectelClient::connect(const char *host, uint16_t port)
     Serial.print(eth.ip_string);
 
     // if (eth.connect(host, port, TCP))
-    if (eth.connect("101.133.196.97", port, TCP))
+    if (eth.connect("101.133.196.109", port, TCP))
     // if (eth.connect("116.5.194.71", 8081, TCP))
     {
         Serial.println("Connect OK!");
