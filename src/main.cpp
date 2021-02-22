@@ -1,6 +1,8 @@
 // #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#include "modules/host_int/host_server.h"
+#include "modules/low_power/STM32LowPower.h"
 #include "modules/flash/stm32_flash.h"
 #include "modules/max31865/max31865.h"
 #include "UART_Interface.h"
@@ -26,6 +28,8 @@
 
 #define LTE_TX PA2
 #define LTE_RX PA3
+
+#define STANDBY_TIME (5 * 1000)
 /*  ---------------------------------------------------------------------------------------------------------------*/
 HardwareSerial LTE_Serial(LTE_RX, LTE_TX);
 
@@ -33,12 +37,60 @@ unsigned long lastMs = 0;
 
 QuectelClient espClient;
 PubSubClient mqttClient(espClient);
-
+STM32LowPower lowPower;
 STM32Flash flash;
 Max31865 rtd1, rtd2;
+// DynamicJsonBuffer jsonBuffer;
+// StaticJsonBuffer<1024> jsonBuffer;
+HostServer hostServer; //与主机通讯接口
 
 float internal_temperature = 0;
 float external_templature = 0;
+
+String configJSON = R"({
+"product_key":"a1vhKQ19mpk",
+"device_name":"CkCuGNUkYm6sWVsbGQl5",
+"device_secret":"ac8e301a20d0ce5f39c06166a3862435",
+"collect_interval":500,
+"total_report_count":10,
+"ip_address":"192.168.1.1",
+"port":1883,
+"standby_time":5
+})";
+
+#define TEMP_LIST_LEN 100
+struct SystemStatus
+{
+public:
+    uint32_t collectCNT = 0;
+    uint16_t index = 0;
+    float internalTemperatures[TEMP_LIST_LEN] = {0};
+    float externalTemperatures[TEMP_LIST_LEN] = {0};
+    std::string tostring()
+    {
+        static std::string out = "";
+        out += "/* SystemStatus ---------------------------------------------------------------------------------------------------------------*/\r\n";
+        out += "collectCNT:" + std::to_string(collectCNT) + "\r\n";
+        out += "index:" + std::to_string(index) + "\r\n";
+        out += "[";
+        for (int i = 0; i < TEMP_LIST_LEN; i++)
+        {
+            out += std::to_string((int)(internalTemperatures[i])) + ",";
+        }
+        out += "]\r\n";
+        out += "[";
+        for (int i = 0; i < TEMP_LIST_LEN; i++)
+        {
+            out += std::to_string((int)(externalTemperatures[i])) + ",";
+        }
+        out += "]\r\n";
+        out += "/* SystemStatus ---------------------------------------------------------------------------------------------------------------*/\r\n";
+        return out;
+    }
+};
+SystemStatus sysStatus; //system running status
+// bool isRefactory = false;
+bool isRefactory = false;
 
 /*  ---------------------------------------------------------------------------------------------------------------*/
 
@@ -78,15 +130,40 @@ void mqttCheckConnect()
 
 void mqttIntervalPost()
 {
-    char param[128];
-    char jsonBuf[128];
+    // static char param[128];
+    static char jsonBuf[2048];
 
-    sprintf(param, "{\"internal_temperature\":%d.%d,\"external_templature\":%d.%d}",
-            (int)internal_temperature, (int)(internal_temperature * 100) % 100,
-            (int)external_templature, (int)(external_templature * 100) % 100);
-    sprintf(jsonBuf, ALINK_BODY_FORMAT, ALINK_METHOD_PROP_POST, param);
+    // sprintf(param, "{\"internal_temperature\":%d.%d,\"external_templature\":%d.%d}",
+    //         (int)internal_temperature, (int)(internal_temperature * 100) % 100,
+    //         (int)external_templature, (int)(external_templature * 100) % 100);
+
+    std::string param = R"({"internal_temperature":[)";
+
+    for (int i = 0; i < TEMP_LIST_LEN; i++)
+    {
+        char str[16] = {0};
+        sprintf(str, "%d.%01d", (int)sysStatus.internalTemperatures[i],
+                (int)(sysStatus.internalTemperatures[i] * 10) % 10);
+        param += str;
+        if (i != TEMP_LIST_LEN - 1)
+            param += ",";
+    }
+    param += "],\r\n";
+    param += R"("external_templature":[)";
+    for (int i = 0; i < TEMP_LIST_LEN; i++)
+    {
+        char str[16] = {0};
+        sprintf(str, "%d.%01d", (int)sysStatus.externalTemperatures[i],
+                (int)(sysStatus.externalTemperatures[i] * 10) % 10);
+        param += str;
+        if (i != TEMP_LIST_LEN - 1)
+            param += ",";
+    }
+    param += "]}\r\n";
+    // Serial.println(("json:" + param).c_str());
+    sprintf(jsonBuf, ALINK_BODY_FORMAT, ALINK_METHOD_PROP_POST, param.c_str());
     Serial.println(jsonBuf);
-    mqttClient.publish(ALINK_TOPIC_PROP_POST, jsonBuf);
+    // mqttClient.publish(ALINK_TOPIC_PROP_POST, jsonBuf);
 }
 
 void setup()
@@ -99,26 +176,42 @@ void setup()
 
     /* initialize serial for debugging */
     Serial.begin(115200);
+    Serial.println("begin...");
+
+    lowPower.begin();
     flash.begin();
+
+    hostServer.parseBean(configJSON.c_str()); //set config by 'configJSON'
+    Serial.println("system config:");
+    String out = hostServer.bean.tostring();
+    Serial.println(out);
 
     rtd1.begin(PA4, PA5, PA6, PA7);
     rtd2.begin(PB12, PB13, PB14, PB15);
 
     LTE_Serial.begin(115200);
 
-    Serial.println("begin...");
-
     mqttClient.setCallback(callback);
 
-    char *str = "hello123456789123451";
-    char *read_buf[10] = {0};
-
-    flash.writeBuffer((uint8_t *)str, strlen(str) + 1);
-    flash.readBuffer((uint8_t *)read_buf, strlen(str) + 1);
-    Serial.println((char *)read_buf);
-    Serial.flush();
-    while (1)
-        ;
+    flash.readBuffer((uint8_t *)&sysStatus, sizeof(SystemStatus));
+    Serial.println("read 'sysStatus'");
+    std::string flashStr = sysStatus.tostring();
+    Serial.println(flashStr.c_str());
+    int i;
+    for (i = 0; i < sizeof(SystemStatus); i++)
+    {
+        uint8_t *pbuf = (uint8_t *)&sysStatus;
+        if (pbuf[i] != 0xff)
+            break;
+    }
+    if (isRefactory)
+    {
+        // uint8_t *pbuf = (uint8_t *)&sysStatus;
+        // memset(pbuf, 0xff, sizeof(SystemStatus));
+        memset((uint8_t *)&sysStatus, 0, sizeof(SystemStatus));
+    }
+    if (i == sizeof(SystemStatus)) //if 'sysStatus' memory both are 0xff,reset it to 0
+        memset((uint8_t *)&sysStatus, 0, sizeof(SystemStatus));
 }
 
 // the loop function runs over and over again forever
@@ -126,20 +219,42 @@ void loop()
 {
     // AT_bypass();
 
-    if (millis() - lastMs >= 5000)
-    {
-        lastMs = millis();
-        mqttCheckConnect();
-
-        /* Post */
-        mqttIntervalPost();
-    }
-
-    mqttClient.loop();
-
     internal_temperature = rtd1.getTemperature();
     external_templature = rtd2.getTemperature();
     Serial.printf("t1=%d,t2=%d\r\n", (int)internal_temperature, (int)external_templature);
 
-    delay(500); // ms
+    if ((sysStatus.collectCNT > 0) && (sysStatus.collectCNT % hostServer.bean.collect_interval == 0))
+    {
+        Serial.println("report temperature to server...");
+        // if (millis() - lastMs >= 5000)
+        // {
+        //     // lastMs = millis();
+        //     mqttCheckConnect();
+
+        //     /* Post */
+        //     mqttIntervalPost();
+        // }
+        // mqttClient.loop();
+        mqttIntervalPost(); //simulate
+    }
+
+    sysStatus.collectCNT++;
+    sysStatus.internalTemperatures[sysStatus.index] = internal_temperature;
+    sysStatus.externalTemperatures[sysStatus.index] = external_templature;
+    if (sysStatus.index == TEMP_LIST_LEN)
+    {
+        sysStatus.index = 0;
+        memset((uint8_t *)sysStatus.internalTemperatures, 0, sizeof(sysStatus.internalTemperatures));
+        memset((uint8_t *)sysStatus.externalTemperatures, 0, sizeof(sysStatus.externalTemperatures));
+    }
+    else
+        sysStatus.index++;
+    Serial.println("write 'sysStatus' to internal flash");
+    std::string out = sysStatus.tostring();
+    Serial.println(out.c_str());
+    flash.writeBuffer((uint8_t *)&sysStatus, sizeof(SystemStatus));
+    Serial.println("standby...");
+    Serial.flush();
+    lowPower.shutdown(hostServer.bean.standby_time);
+    // delay(500); // ms
 }
