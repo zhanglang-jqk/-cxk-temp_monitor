@@ -9,8 +9,10 @@
 /* 包含头文件 -------------------------------------------------------------------*/
 #include "quectel_client.h"
 #include "ethernet.h"
+#include "modules/host_int/host_server.h"
 /* 宏定义 -----------------------------------------------------------------------*/
 /* 类型定义 ---------------------------------------------------------------------*/
+extern HostServer hostServer; //与主机通讯接口
 /* 私有变量 ---------------------------------------------------------------------*/
 Ethernet eth = Ethernet();
 
@@ -33,8 +35,6 @@ int QuectelClient::connect(const char *host, uint16_t port)
 {
     // wio.Power_On();
     pinMode(PWR4G_PIN, OUTPUT), OPEN_4GPWR();
-    pinMode(VDD_PIN, OUTPUT), CLOSE_VDD();
-
     pinMode(PWRKEY_PIN, OUTPUT);
     PWRKEY_LOW(), delay(800), PWRKEY_HIGH();
     // eth.Power_On();
@@ -56,8 +56,8 @@ int QuectelClient::connect(const char *host, uint16_t port)
     Serial.print(eth.ip_string);
 
     // if (eth.connect(host, port, TCP))
-    if (eth.connect("101.133.196.109", port, TCP))
-    // if (eth.connect("116.5.194.71", 8081, TCP))
+    //TODO remote ip is static
+    if (eth.connect(hostServer.bean.ip_address.c_str(), port, TCP))
     {
         Serial.println("Connect OK!");
         Serial.flush();

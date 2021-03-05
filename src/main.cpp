@@ -20,11 +20,15 @@
 #define ALINK_TOPIC_PROP_SET "/sys/" PRODUCT_KEY "/" DEVICE_NAME "/thing/service/property/set"
 #define ALINK_METHOD_PROP_POST "thing.event.property.post"
 
+#define VDD_PIN PA11
+#define LED_BUILTIN PB11
+
 #define OPEN_LED() digitalWrite(LED_BUILTIN, LOW)
 #define CLOSE_LED() digitalWrite(LED_BUILTIN, HIGH)
 #define TOGGLE_LED() digitalToggle(LED_BUILTIN)
 
-#define LED_BUILTIN PB11
+#define OPEN_VDD() digitalWrite(VDD_PIN, LOW)
+#define CLOSE_VDD() digitalWrite(VDD_PIN, HIGH)
 
 #define LTE_TX PA2
 #define LTE_RX PA3
@@ -47,13 +51,24 @@ HostServer hostServer; //与主机通讯接口
 float internal_temperature = 0;
 float external_templature = 0;
 
+// String configJSON = R"({
+// "product_key":"a1vhKQ19mpk",
+// "device_name":"CkCuGNUkYm6sWVsbGQl5",
+// "device_secret":"ac8e301a20d0ce5f39c06166a3862435",
+// "collect_interval":500,
+// "total_report_count":10,
+// "ip_address":"101.133.196.109",
+// "port":1883,
+// "standby_time":5
+// })";
+
 String configJSON = R"({
-"product_key":"a1vhKQ19mpk",
-"device_name":"CkCuGNUkYm6sWVsbGQl5",
-"device_secret":"ac8e301a20d0ce5f39c06166a3862435",
+"product_key":"a1ncEmjzVzj",
+"device_name":"pC8b52IBYtcN5E4a4hjV",
+"device_secret":"de71106836fb59df395ad76eb9014ec9",
 "collect_interval":500,
 "total_report_count":10,
-"ip_address":"192.168.1.1",
+"ip_address":"101.133.196.109",
 "port":1883,
 "standby_time":5
 })";
@@ -102,7 +117,7 @@ void callback(char *topic, byte *payload, unsigned int length)
     payload[length] = '\0';
     Serial.println((char *)payload);
 
-    if (strstr(topic, ALINK_TOPIC_PROP_SET))
+    if (strstr(topic, hostServer.bean.alink_topic_prop_set.c_str()))
     {
         StaticJsonBuffer<100> jsonBuffer;
         JsonObject &root = jsonBuffer.parseObject(payload);
@@ -118,12 +133,14 @@ void mqttCheckConnect()
 {
     if (!mqttClient.connected())
     {
-        while (!connectAliyunMQTT(mqttClient, PRODUCT_KEY, DEVICE_NAME, DEVICE_SECRET))
+        while (!connectAliyunMQTT(mqttClient,
+                                  hostServer.bean.product_key.c_str(),
+                                  hostServer.bean.device_name.c_str(),
+                                  hostServer.bean.device_secret.c_str()))
         {
         }
         Serial.println("MQTT connect succeed!");
-        // client.subscribe(ALINK_TOPIC_PROP_POSTRSP);
-        mqttClient.subscribe(ALINK_TOPIC_PROP_SET);
+        mqttClient.subscribe(hostServer.bean.alink_topic_prop_set.c_str());
         Serial.println("subscribe done");
     }
 }
@@ -137,9 +154,16 @@ void mqttIntervalPost()
             (int)internal_temperature, (int)(internal_temperature * 100) % 100,
             (int)external_templature, (int)(external_templature * 100) % 100);
 
-    sprintf(jsonBuf, ALINK_BODY_FORMAT, ALINK_METHOD_PROP_POST, param);
-    Serial.println(jsonBuf);
-    mqttClient.publish(ALINK_TOPIC_PROP_POST, jsonBuf);
+    sprintf(jsonBuf, hostServer.bean.alink_body_format.c_str(), hostServer.bean.alink_method_prop_post.c_str(), param);
+    Serial.println(String("publish:") + jsonBuf);
+    bool isok = mqttClient.publish(hostServer.bean.alink_topic_prop_post.c_str(), jsonBuf);
+    if (isok)
+    {
+        Serial.println("publish fail,reset...");
+        Serial.flush();
+        delay(200);
+        HAL_NVIC_SystemReset();
+    }
 }
 
 void setup()
@@ -149,6 +173,11 @@ void setup()
 
     // pinMode(PWRKEY_PIN, OUTPUT);
     // PWRKEY_LOW(), delay(800), PWRKEY_HIGH();
+
+    pinMode(LED_BUILTIN, OUTPUT);
+
+    pinMode(VDD_PIN, OUTPUT), CLOSE_VDD();
+    OPEN_VDD();
 
     /* initialize serial for debugging */
     Serial.begin(115200);
@@ -195,7 +224,7 @@ void loop()
 
     internal_temperature = rtd1.getTemperature();
     external_templature = rtd2.getTemperature();
-    Serial.printf("t1=%d,t2=%d\r\n", (int)internal_temperature, (int)external_templature);
+    // Serial.printf("t1=%d,t2=%d\r\n", (int)internal_temperature, (int)external_templature);
 
     if (millis() - lastMs >= 5000)
     {
@@ -207,4 +236,11 @@ void loop()
         lastMs = millis();
     }
     mqttClient.loop();
+
+    static uint32_t runLED_c = 0;
+    if (millis() - runLED_c > 100)
+    {
+        TOGGLE_LED();
+        runLED_c = millis();
+    }
 }

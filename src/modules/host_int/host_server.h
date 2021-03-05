@@ -20,6 +20,13 @@ public:
     String product_key;
     String device_name;
     String device_secret;
+    /*  ---------------------------------------------------------------------------------------------------------------*/
+    String alink_body_format;
+    String alink_topic_prop_post;
+    String alink_topic_prop_postrsp;
+    String alink_topic_prop_set;
+    String alink_method_prop_post;
+    /*  ---------------------------------------------------------------------------------------------------------------*/
     int collect_interval = 0;
     int total_report_count = 0;
     String ip_address;
